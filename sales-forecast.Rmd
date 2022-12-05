@@ -1,0 +1,166 @@
+---
+title: "Sales Forecast"
+author: "Yu Yuen Hern"
+date: "`r Sys.Date()`"
+output: html_notebook
+runtime: shiny
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+```{r, echo=F}
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+library(stats)
+
+DATASET_PATH <- "dataset/Data.xlsx"
+```
+
+## Read dataset
+```{r}
+df <- readxl::read_xlsx(DATASET_PATH, sheet = "Data")
+df
+```
+
+## Check for missing values
+```{r}
+sum(is.na(df$`Sales Amt`))
+```
+
+```{r}
+df$`Sales Amt`[is.na(df$`Sales Amt`)] = 0
+sum(is.na(df$`Sales Amt`))
+```
+
+## Plot sales over time
+```{r}
+p <- ggplot(df, aes(x=`PO Date`, y=`Sales Amt`)) + geom_line()
+p
+```
+
+## Holt Winters
+
+As Holt-Winters function require time series `ts` object and `ts` object only accepts evenly spaced data, we aggregate the daily data into monthly data.
+```{r}
+df <- df[c("Year", "Month", "Sales Amt")]
+df
+```
+
+Aggregate the data
+```{r}
+df <- df %>% group_by(Year, Month) %>% summarise(Monthly_Sales=sum(`Sales Amt`))
+df
+```
+
+Split the dataset into train (2019 and 2020) and test (2021)
+```{r}
+df_train <- subset(df, Year <= 2020)
+df_test <- subset(df, Year == 2021)
+```
+
+Overall plot of data
+```{r}
+dfts <- df$Monthly_Sales %>% ts(start = c(2019, 1), end = c(2021, 12), frequency = 12)
+plot(dfts)
+```
+
+Convert the data into `ts` object
+```{r}
+dfts_train <- df_train$Monthly_Sales %>% ts(start = c(2019, 1), end = c(2020, 12), frequency = 12)
+dfts_train
+```
+
+Perform Holt-Winters fitting
+```{r}
+hw1 <- HoltWinters(dfts_train)
+hw1
+```
+
+Perform Holt-Winters prediction and overlay forecast on original data
+```{r}
+hw1.pred <- predict(hw1, n.ahead = 12, prediction.interval = TRUE, level = 0.95)
+plot(hw1, predicted.values = hw1.pred, ylab = "Sales Amt")
+```
+
+Perform Holt-Winters fitting with multiplicative seasonality
+```{r}
+hw2 <- HoltWinters(dfts_train, seasonal = "multiplicative")
+hw2.pred <- predict(hw2, n.ahead = 12, prediction.interval = TRUE, level = 0.95)
+plot(hw2, predicted.values = hw2.pred, ylab = "Sales Amt")
+```
+
+## Using forecast library
+```{r}
+library(forecast)
+```
+
+Plot hw1 model with forecast library
+```{r}
+hw1_for <- forecast(hw1, h = 12, level = 0.95)
+plot(hw1_for)
+lines(hw1_for$fitted, lty=2, col="red")
+```
+
+Plot hw2 model with forecast library
+```{r}
+hw2_for <- forecast(hw2, h = 12, level = 0.95)
+plot(hw2_for)
+lines(hw2_for$fitted, lty=2, col="red")
+```
+
+## Evaluate
+
+Firstly we want to check if there are any autocorrelation in residue.
+```{r}
+hw1_acf <- acf(hw1_for$residuals, lag.max = 12, na.action=na.pass)
+```
+
+There is no autocorrelation as the values are all below blue line.
+
+Secondly, we want to find out if the variable are independent using Ljung-Box test.
+```{r}
+Box.test(hw1_for$residuals, type="Ljung-Box")
+```
+
+The p-value from Ljung Box Test is 0.1428 for lag=1, hence we fail reject the hypothesis. The variables are independent.
+
+Thirdly, we check if the residuals are normally distributed.
+```{r}
+hist(hw1_for$residuals)
+```
+
+The histogram is normally distributed.
+
+And lastly, we check the MAPE of both Holt-Winters model.
+```{r}
+mape <- function(actual,pred){
+  mape <- mean(abs((actual - pred)/actual))*100
+  return (mape)
+}
+```
+
+```{r}
+mape_hw1 <- mape(df_test$Monthly_Sales, hw1.pred[,1])
+mape_hw2 <- mape(df_test$Monthly_Sales, hw2.pred[,1])
+cat(mape_hw1, mape_hw2)
+```
+MAPE for HW1 is 18.76 while HW2 is 17.79
+
+## Forecast 36 months (12 months of dfts_test + 24 months as requested)
+```{r}
+dfts_test <- df_test$Monthly_Sales %>% ts(start = c(2021, 1), end = c(2021, 12), frequency = 12)
+
+hw1_for <- forecast(hw1, h = 36, level = 0.95)
+plot(hw1_for, ylim = c(0,2.3e+7))
+lines(dfts, lty = 2, col = "red")
+legend(x = "topright", legend=c("Forecast", "Fitted", "Original"), col=c("blue", "black", "red"), lty=1:2, cex = 0.6)
+```
+
+Original series is in red, fitted values in black and forecast values in blue.
