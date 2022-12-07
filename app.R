@@ -15,7 +15,6 @@ ui <- fluidPage(
   sidebarLayout(
     
     sidebarPanel(
-      
       h5("Please ensure your uploaded CSV data (< 5MB) contains 
          `Year`, `Month` and `Sales Amt` columns."),
       
@@ -27,7 +26,6 @@ ui <- fluidPage(
                     "text/comma-separated-values,text/plain",
                     ".csv")),
       actionButton(inputId = "run_button", label = "Start forecast")
-      
     ),
     
     mainPanel(
