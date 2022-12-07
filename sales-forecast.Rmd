@@ -59,6 +59,10 @@ df <- df %>% group_by(Year, Month) %>% summarise(Monthly_Sales=sum(`Sales Amt`))
 df
 ```
 
+```{r}
+tail(unique(df$Year), 2)[1]
+```
+
 Split the dataset into train (2019 and 2020) and test (2021)
 ```{r}
 df_train <- subset(df, Year <= 2020)
@@ -140,7 +144,7 @@ The histogram is normally distributed.
 
 And lastly, we check the MAPE of both Holt-Winters model.
 ```{r}
-mape <- function(actual,pred){
+mape <- function(actual, pred){
   mape <- mean(abs((actual - pred)/actual))*100
   return (mape)
 }

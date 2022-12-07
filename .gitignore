@@ -37,3 +37,9 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# dataset
+dataset
+
+# shiny deployment
+rsconnect
