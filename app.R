@@ -164,12 +164,12 @@ server <- function(input, output) {
   })
   
   # Render box test interpretation
-  output$interpret_boxtest <- renderText(
+  output$interpret_boxtest <- renderText({
     "The Ljung-Box test checks if the residual is independent 
     (residual is supposed to be independent). 
     Residual is independent or random if p-value > 0.05, i.e.
     we fail to reject the null hypothesis."
-  )
+  })
 }
 
 # shiny object
